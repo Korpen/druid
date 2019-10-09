@@ -22,11 +22,12 @@ use crate::shell::window::WindowHandle;
 use crate::shell::{init, runloop, Error as PlatformError, WindowBuilder};
 use crate::win_handler::AppState;
 use crate::window::{Window, WindowId};
-use crate::{theme, Data, DruidHandler, LocalizedString, MenuDesc, Widget};
+use crate::{theme, AppDelegate, Data, DruidHandler, LocalizedString, MenuDesc, Widget};
 
 /// Handles initial setup of an application, and starts the runloop.
 pub struct AppLauncher<T> {
     windows: Vec<WindowDesc<T>>,
+    delegate: Option<AppDelegate<T>>,
 }
 
 /// A function that can create a widget.
@@ -48,7 +49,16 @@ impl<T: Data + 'static> AppLauncher<T> {
     pub fn with_window(window: WindowDesc<T>) -> Self {
         AppLauncher {
             windows: vec![window],
+            delegate: None,
         }
+    }
+
+    /// Set the [`AppDelegate`].
+    ///
+    /// [`AppDelegate`]: struct.AppDelegate.html
+    pub fn delegate(mut self, delegate: AppDelegate<T>) -> Self {
+        self.delegate = Some(delegate);
+        self
     }
 
     /// Initialize a minimal logger for printing logs out to stderr.
@@ -63,11 +73,11 @@ impl<T: Data + 'static> AppLauncher<T> {
     ///
     /// Returns an error if a window cannot be instantiated. This is usually
     /// a fatal error.
-    pub fn launch(self, data: T) -> Result<(), PlatformError> {
+    pub fn launch(mut self, data: T) -> Result<(), PlatformError> {
         init();
         let mut main_loop = runloop::RunLoop::new();
         let env = theme::init();
-        let state = AppState::new(data, env);
+        let state = AppState::new(data, env, self.delegate.take());
 
         for desc in self.windows {
             let window = desc.build_native(&state)?;
